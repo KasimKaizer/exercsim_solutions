@@ -1,0 +1,36 @@
+name: Auto-merge Exercism solutions
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: auto-merge-exercism-solutions
+  cancel-in-progress: false
+
+jobs:
+  auto-merge:
+    if: >
+      github.event.pull_request.user.login == 'exercism-solutions-syncer[bot]' &&
+      github.event.pull_request.user.type == 'Bot' &&
+      !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Merge pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          pr_number="${{ github.event.pull_request.number }}"
+          for attempt in 1 2 3 4 5; do
+            if gh pr merge "$pr_number" --merge --delete-branch; then
+              exit 0
+            fi
+            echo "Merge attempt ${attempt} failed; retrying in 5s..."
+            sleep 5
+          done
+          echo "Failed to merge PR #${pr_number} after retries" >&2
+          exit 1
